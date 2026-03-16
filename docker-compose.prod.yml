@@ -1,0 +1,91 @@
+services:
+  postgres:
+    ports: []
+    expose:
+      - "5432"
+
+  redis:
+    ports: []
+    expose:
+      - "6379"
+
+  auth-service:
+    ports: []
+    expose:
+      - "8001"
+
+  project-service:
+    ports: []
+    expose:
+      - "8002"
+
+  agent-service:
+    ports: []
+    expose:
+      - "8003"
+
+  task-service:
+    ports: []
+    expose:
+      - "8004"
+
+  workflow-service:
+    ports: []
+    expose:
+      - "8005"
+
+  workflow-engine:
+    ports: []
+    expose:
+      - "8100"
+
+  agent-runtime:
+    ports: []
+    expose:
+      - "8200"
+
+  frontend:
+    ports: []
+    expose:
+      - "3000"
+
+  nginx:
+    restart: unless-stopped
+    init: true
+    build:
+      context: .
+      dockerfile: docker/nginx/Dockerfile
+    depends_on:
+      frontend:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+      project-service:
+        condition: service_healthy
+      agent-service:
+        condition: service_healthy
+      task-service:
+        condition: service_healthy
+      workflow-service:
+        condition: service_healthy
+      workflow-engine:
+        condition: service_healthy
+      agent-runtime:
+        condition: service_healthy
+    ports:
+      - "${NGINX_HTTP_PORT:-80}:8080"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8080/health/live"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx
+      - /var/run
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - platform-backbone

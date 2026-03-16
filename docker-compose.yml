@@ -1,0 +1,641 @@
+name: ai-workforce-platform
+
+x-platform-service: &platform-service
+  restart: unless-stopped
+  init: true
+  env_file:
+    - ${ENV_FILE:-.env}
+  networks:
+    - platform-backbone
+  security_opt:
+    - no-new-privileges:true
+  tmpfs:
+    - /tmp
+
+x-backend-build: &backend-build
+  context: .
+  dockerfile: docker/backend/Dockerfile
+
+x-backend-build-args: &backend-build-args
+  DEBIAN_MIRROR: ${DEBIAN_MIRROR:-}
+  DEBIAN_SECURITY_MIRROR: ${DEBIAN_SECURITY_MIRROR:-}
+  PIP_INDEX_URL: ${PIP_INDEX_URL:-}
+  PIP_EXTRA_INDEX_URL: ${PIP_EXTRA_INDEX_URL:-}
+  PIP_TRUSTED_HOST: ${PIP_TRUSTED_HOST:-}
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    env_file:
+      - ${ENV_FILE:-.env}
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "${POSTGRES_PUBLISHED_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    networks:
+      - platform-backbone
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    env_file:
+      - ${ENV_FILE:-.env}
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD}"]
+    ports:
+      - "${REDIS_PUBLISHED_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a ${REDIS_PASSWORD} ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - platform-backbone
+
+  qdrant:
+    image: qdrant/qdrant:v1.7.4
+    platform: linux/amd64
+    restart: unless-stopped
+    ports:
+      - "${QDRANT_PUBLISHED_PORT:-6333}:6333"
+    volumes:
+      - qdrant-data:/qdrant/storage
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c ': </dev/tcp/127.0.0.1/6333' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    networks:
+      - platform-backbone
+
+  backend-init:
+    <<: *platform-service
+    restart: "no"
+    build:
+      <<: *backend-build
+      args:
+        <<: *backend-build-args
+        SERVICE_PATH: backend
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["python", "scripts/init_service_databases.py"]
+
+  api-gateway:
+    restart: unless-stopped
+    init: true
+    env_file:
+      - ${ENV_FILE:-.env}
+    build:
+      context: .
+      dockerfile: docker/gateway/Dockerfile
+    environment:
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      JWT_ALGORITHM: ${JWT_ALGORITHM}
+      JWT_ISSUER: ${JWT_ISSUER}
+      JWT_AUDIENCE: ${JWT_AUDIENCE}
+      AUTH_SERVICE_URL: http://auth-service:8001
+      PROJECT_SERVICE_URL: http://project-service:8002
+      AGENT_SERVICE_URL: http://agent-service:8003
+      TASK_SERVICE_URL: http://task-service:8004
+      WORKFLOW_SERVICE_URL: http://workflow-service:8005
+      TOOL_SERVICE_URL: http://tool-service:8006
+      ADMIN_SERVICE_URL: http://admin-service:8007
+      WORKFLOW_ENGINE_URL: http://workflow-engine:8100
+      AGENT_RUNTIME_URL: http://agent-runtime:8200
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      project-service:
+        condition: service_healthy
+      tool-service:
+        condition: service_healthy
+    ports:
+      - "${API_GATEWAY_PORT:-8300}:8300"
+    networks:
+      - platform-backbone
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8300/health/live').read()"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  tool-service:
+    <<: *platform-service
+    build:
+      <<: *backend-build
+      args:
+        <<: *backend-build-args
+        SERVICE_PATH: backend/services/tool-service
+    environment:
+      SERVICE_NAME: tool-service
+      PORT: "8006"
+    ports:
+      - "${TOOL_SERVICE_PORT:-8006}:8006"
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8006"]
+    depends_on:
+      backend-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8006/health/live').read()"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+
+  admin-service:
+    <<: *platform-service
+    build:
+      <<: *backend-build
+      args:
+        <<: *backend-build-args
+        SERVICE_PATH: backend/services/admin-service
+    environment:
+      SERVICE_NAME: admin-service
+      PORT: "8007"
+      DATABASE_URL: ${DATABASE_URL}
+      PROJECT_SERVICE_URL: http://project-service:8002
+      AGENT_SERVICE_URL: http://agent-service:8003
+      TASK_SERVICE_URL: http://task-service:8004
+    ports:
+      - "${ADMIN_SERVICE_PORT:-8007}:8007"
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8007"]
+    depends_on:
+      backend-init:
+        condition: service_completed_successfully
+      project-service:
+        condition: service_healthy
+      agent-service:
+        condition: service_healthy
+      task-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8007/health/live').read()"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+
+  auth-service:
+    <<: *platform-service
+    build:
+      <<: *backend-build
+      args:
+        <<: *backend-build-args
+        SERVICE_PATH: backend/services/auth-service
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT}
+      SERVICE_NAME: ${AUTH_SERVICE_NAME}
+      PORT: ${AUTH_SERVICE_PORT}
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${AUTH_REDIS_URL}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      JWT_ALGORITHM: ${JWT_ALGORITHM}
+      JWT_ISSUER: ${JWT_ISSUER}
+      JWT_AUDIENCE: ${JWT_AUDIENCE}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend-init:
+        condition: service_completed_successfully
+    ports:
+      - "${AUTH_SERVICE_PORT}:8001"
+    command:
+      [
+        "uvicorn",
+        "app.main:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8001",
+        "--workers",
+        "${API_WEB_CONCURRENCY:-2}",
+      ]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health/live').read()"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  project-service:
+    <<: *platform-service
+    build:
+      <<: *backend-build
+      args:
+        <<: *backend-build-args
+        SERVICE_PATH: backend/services/project-service
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT}
+      SERVICE_NAME: ${PROJECT_SERVICE_NAME}
+      PORT: ${PROJECT_SERVICE_PORT}
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${PROJECT_REDIS_URL}
+      QDRANT_URL: ${QDRANT_URL:-http://qdrant:6333}
+      ADMIN_SERVICE_URL: ${ADMIN_SERVICE_URL:-http://admin-service:8007}
+      WORKFLOW_SERVICE_URL: ${WORKFLOW_SERVICE_URL:-http://workflow-service:8005}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      JWT_ALGORITHM: ${JWT_ALGORITHM}
+      JWT_ISSUER: ${JWT_ISSUER}
+      JWT_AUDIENCE: ${JWT_AUDIENCE}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend-init:
+        condition: service_completed_successfully
+    ports:
+      - "${PROJECT_SERVICE_PORT}:8002"
+    command:
+      [
+        "uvicorn",
+        "app.main:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8002",
+        "--workers",
+        "${API_WEB_CONCURRENCY:-2}",
+      ]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8002/health/live').read()"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  agent-service:
+    <<: *platform-service
+    build:
+      <<: *backend-build
+      args:
+        <<: *backend-build-args
+        SERVICE_PATH: backend/services/agent-service
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT}
+      SERVICE_NAME: ${AGENT_SERVICE_NAME}
+      PORT: ${AGENT_SERVICE_PORT}
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${AGENT_REDIS_URL}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      JWT_ALGORITHM: ${JWT_ALGORITHM}
+      JWT_ISSUER: ${JWT_ISSUER}
+      JWT_AUDIENCE: ${JWT_AUDIENCE}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend-init:
+        condition: service_completed_successfully
+    ports:
+      - "${AGENT_SERVICE_PORT}:8003"
+    command:
+      [
+        "uvicorn",
+        "app.main:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8003",
+        "--workers",
+        "${API_WEB_CONCURRENCY:-2}",
+      ]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8003/health/live').read()"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  task-service:
+    <<: *platform-service
+    build:
+      <<: *backend-build
+      args:
+        <<: *backend-build-args
+        SERVICE_PATH: backend/services/task-service
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT}
+      SERVICE_NAME: ${TASK_SERVICE_NAME}
+      PORT: ${TASK_SERVICE_PORT}
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${TASK_REDIS_URL}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      JWT_ALGORITHM: ${JWT_ALGORITHM}
+      JWT_ISSUER: ${JWT_ISSUER}
+      JWT_AUDIENCE: ${JWT_AUDIENCE}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES}
+      TASK_QUEUE_NAME: ${TASK_QUEUE_NAME}
+      TASK_WORKER_BLOCK_SECONDS: ${TASK_WORKER_BLOCK_SECONDS}
+      TASK_DEFAULT_MAX_ATTEMPTS: ${TASK_DEFAULT_MAX_ATTEMPTS}
+      ADMIN_SERVICE_URL: ${ADMIN_SERVICE_URL:-http://admin-service:8007}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend-init:
+        condition: service_completed_successfully
+    ports:
+      - "${TASK_SERVICE_PORT}:8004"
+    command:
+      [
+        "uvicorn",
+        "app.main:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8004",
+        "--workers",
+        "${API_WEB_CONCURRENCY:-2}",
+      ]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8004/health/live').read()"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  task-worker:
+    <<: *platform-service
+    build:
+      <<: *backend-build
+      args:
+        <<: *backend-build-args
+        SERVICE_PATH: backend/services/task-service
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT}
+      SERVICE_NAME: ${TASK_SERVICE_NAME}-worker
+      PORT: ${TASK_SERVICE_PORT}
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${TASK_REDIS_URL}
+      TASK_QUEUE_NAME: ${TASK_QUEUE_NAME}
+      TASK_WORKER_BLOCK_SECONDS: ${TASK_WORKER_BLOCK_SECONDS}
+      TASK_DEFAULT_MAX_ATTEMPTS: ${TASK_DEFAULT_MAX_ATTEMPTS}
+      AGENT_RUNTIME_URL: ${AGENT_RUNTIME_URL:-http://agent-runtime:8200}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend-init:
+        condition: service_completed_successfully
+      agent-runtime:
+        condition: service_healthy
+    command: ["python", "-m", "app.worker"]
+
+  workflow-service:
+    <<: *platform-service
+    build:
+      <<: *backend-build
+      args:
+        <<: *backend-build-args
+        SERVICE_PATH: backend/services/workflow-service
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT}
+      SERVICE_NAME: ${WORKFLOW_SERVICE_NAME}
+      PORT: ${WORKFLOW_SERVICE_PORT}
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${WORKFLOW_REDIS_URL}
+      WORKFLOW_ENGINE_URL: ${WORKFLOW_ENGINE_URL}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      JWT_ALGORITHM: ${JWT_ALGORITHM}
+      JWT_ISSUER: ${JWT_ISSUER}
+      JWT_AUDIENCE: ${JWT_AUDIENCE}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend-init:
+        condition: service_completed_successfully
+    ports:
+      - "${WORKFLOW_SERVICE_PORT}:8005"
+    command:
+      [
+        "uvicorn",
+        "app.main:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8005",
+        "--workers",
+        "${API_WEB_CONCURRENCY:-2}",
+      ]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8005/health/live').read()"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  workflow-engine:
+    <<: *platform-service
+    build:
+      <<: *backend-build
+      args:
+        <<: *backend-build-args
+        SERVICE_PATH: workflow-engine
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT}
+      SERVICE_NAME: ${WORKFLOW_ENGINE_NAME}
+      PORT: ${WORKFLOW_ENGINE_PORT}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      REDIS_URL: ${WORKFLOW_ENGINE_REDIS_URL}
+      BROKER_STREAM: ${WORKFLOW_ENGINE_BROKER_STREAM}
+      EXECUTION_QUEUE_NAME: ${EXECUTION_QUEUE_NAME}
+      EXECUTION_STATE_PREFIX: ${EXECUTION_STATE_PREFIX}
+      EXECUTION_INDEX_KEY: ${EXECUTION_INDEX_KEY}
+      EXECUTION_WORKER_BLOCK_SECONDS: ${EXECUTION_WORKER_BLOCK_SECONDS}
+      MAX_DELAY_SECONDS: ${MAX_DELAY_SECONDS}
+    depends_on:
+      redis:
+        condition: service_healthy
+    ports:
+      - "${WORKFLOW_ENGINE_PORT}:8100"
+    command:
+      [
+        "uvicorn",
+        "app.main:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8100",
+        "--workers",
+        "${ENGINE_WEB_CONCURRENCY:-2}",
+      ]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8100/health/live').read()"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  workflow-engine-worker:
+    <<: *platform-service
+    build:
+      <<: *backend-build
+      args:
+        <<: *backend-build-args
+        SERVICE_PATH: workflow-engine
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT}
+      SERVICE_NAME: ${WORKFLOW_ENGINE_NAME}-worker
+      PORT: ${WORKFLOW_ENGINE_PORT}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      REDIS_URL: ${WORKFLOW_ENGINE_REDIS_URL}
+      BROKER_STREAM: ${WORKFLOW_ENGINE_BROKER_STREAM}
+      EXECUTION_QUEUE_NAME: ${EXECUTION_QUEUE_NAME}
+      EXECUTION_STATE_PREFIX: ${EXECUTION_STATE_PREFIX}
+      EXECUTION_INDEX_KEY: ${EXECUTION_INDEX_KEY}
+      EXECUTION_WORKER_BLOCK_SECONDS: ${EXECUTION_WORKER_BLOCK_SECONDS}
+      MAX_DELAY_SECONDS: ${MAX_DELAY_SECONDS}
+    depends_on:
+      redis:
+        condition: service_healthy
+      workflow-engine:
+        condition: service_started
+    command: ["python", "-m", "app.core.worker"]
+
+  agent-runtime:
+    <<: *platform-service
+    build:
+      <<: *backend-build
+      args:
+        <<: *backend-build-args
+        SERVICE_PATH: agent-runtime
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT}
+      SERVICE_NAME: ${AGENT_RUNTIME_NAME}
+      PORT: ${AGENT_RUNTIME_PORT}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      REDIS_URL: ${AGENT_RUNTIME_REDIS_URL}
+      QDRANT_URL: ${QDRANT_URL:-http://qdrant:6333}
+      DEFAULT_MODEL: ${AGENT_RUNTIME_DEFAULT_MODEL}
+      TOOL_TIMEOUT_SECONDS: ${AGENT_RUNTIME_TOOL_TIMEOUT_SECONDS}
+      ENABLED_TOOL_PLUGINS: ${ENABLED_TOOL_PLUGINS}
+      MEMORY_KEY_PREFIX: ${MEMORY_KEY_PREFIX}
+      ANALYTICS_KEY_PREFIX: ${ANALYTICS_KEY_PREFIX}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL}
+      PROJECT_SERVICE_URL: ${PROJECT_SERVICE_URL:-http://project-service:8002}
+      CLAUDE_API_KEY: ${CLAUDE_API_KEY}
+      CLAUDE_BASE_URL: ${CLAUDE_BASE_URL}
+      LOCAL_MODEL_BASE_URL: ${LOCAL_MODEL_BASE_URL}
+      LOCAL_MODEL_API_KEY: ${LOCAL_MODEL_API_KEY}
+      LLM_REQUEST_TIMEOUT_SECONDS: ${LLM_REQUEST_TIMEOUT_SECONDS}
+    depends_on:
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+    ports:
+      - "${AGENT_RUNTIME_PORT}:8200"
+    command:
+      [
+        "uvicorn",
+        "app.main:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8200",
+        "--workers",
+        "${RUNTIME_WEB_CONCURRENCY:-2}",
+      ]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8200/health/live').read()"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  frontend:
+    <<: *platform-service
+    build:
+      context: .
+      dockerfile: docker/frontend/Dockerfile
+      args:
+        NEXT_PUBLIC_API_GATEWAY_URL: ${NEXT_PUBLIC_API_GATEWAY_URL:-}
+        NEXT_PUBLIC_AUTH_SERVICE_URL: ${NEXT_PUBLIC_AUTH_SERVICE_URL}
+        NEXT_PUBLIC_PROJECT_SERVICE_URL: ${NEXT_PUBLIC_PROJECT_SERVICE_URL}
+        NEXT_PUBLIC_AGENT_SERVICE_URL: ${NEXT_PUBLIC_AGENT_SERVICE_URL}
+        NEXT_PUBLIC_TASK_SERVICE_URL: ${NEXT_PUBLIC_TASK_SERVICE_URL}
+        NEXT_PUBLIC_WORKFLOW_SERVICE_URL: ${NEXT_PUBLIC_WORKFLOW_SERVICE_URL}
+        NEXT_PUBLIC_WORKFLOW_ENGINE_URL: ${NEXT_PUBLIC_WORKFLOW_ENGINE_URL}
+        NEXT_PUBLIC_AGENT_RUNTIME_URL: ${NEXT_PUBLIC_AGENT_RUNTIME_URL}
+    environment:
+      NEXT_PUBLIC_API_GATEWAY_URL: ${NEXT_PUBLIC_API_GATEWAY_URL:-}
+      NEXT_PUBLIC_AUTH_SERVICE_URL: ${NEXT_PUBLIC_AUTH_SERVICE_URL}
+      NEXT_PUBLIC_PROJECT_SERVICE_URL: ${NEXT_PUBLIC_PROJECT_SERVICE_URL}
+      NEXT_PUBLIC_AGENT_SERVICE_URL: ${NEXT_PUBLIC_AGENT_SERVICE_URL}
+      NEXT_PUBLIC_TASK_SERVICE_URL: ${NEXT_PUBLIC_TASK_SERVICE_URL}
+      NEXT_PUBLIC_WORKFLOW_SERVICE_URL: ${NEXT_PUBLIC_WORKFLOW_SERVICE_URL}
+      NEXT_PUBLIC_WORKFLOW_ENGINE_URL: ${NEXT_PUBLIC_WORKFLOW_ENGINE_URL}
+      NEXT_PUBLIC_AGENT_RUNTIME_URL: ${NEXT_PUBLIC_AGENT_RUNTIME_URL}
+      NEXT_TELEMETRY_DISABLED: ${NEXT_TELEMETRY_DISABLED}
+      HOSTNAME: 0.0.0.0
+      PORT: 3000
+    depends_on:
+      auth-service:
+        condition: service_healthy
+      project-service:
+        condition: service_healthy
+      agent-service:
+        condition: service_healthy
+      task-service:
+        condition: service_healthy
+      workflow-service:
+        condition: service_healthy
+      workflow-engine:
+        condition: service_healthy
+      agent-runtime:
+        condition: service_healthy
+    ports:
+      - "${FRONTEND_PUBLISHED_PORT:-3000}:3000"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:3000"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+volumes:
+  postgres-data:
+  redis-data:
+  qdrant-data:
+
+networks:
+  platform-backbone:
+    driver: bridge

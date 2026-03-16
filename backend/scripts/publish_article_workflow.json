@@ -1,0 +1,17 @@
+{
+  "name": "Publish Article Workflow",
+  "slug": "publish_article_workflow",
+  "description": "fetch_content → seo_generate → publish_wordpress → log_result",
+  "steps": [
+    {"tool": "fetch_content", "id": "fetch_content", "name": "Fetch Content"},
+    {"tool": "seo.generate_meta", "id": "seo_generate", "name": "SEO Generate Meta"},
+    {"tool": "wordpress.publish_post", "id": "publish_wordpress", "name": "Publish to WordPress"},
+    {"tool": "log_result", "id": "log_result", "name": "Log Result"}
+  ],
+  "tool_mapping": {
+    "fetch_content": {"tool_name": "fetch_content", "action": "fetch"},
+    "seo.generate_meta": {"tool_name": "seo_generate_meta", "action": "generate"},
+    "wordpress.publish_post": {"tool_name": "wordpress_publish_post", "action": "publish"},
+    "log_result": {"tool_name": "log_result", "action": "log"}
+  }
+}

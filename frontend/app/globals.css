@@ -1,0 +1,46 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    @apply bg-slate-950;
+  }
+
+  body {
+    @apply bg-slate-950 text-slate-50 antialiased;
+    font-family:
+      "PingFang SC",
+      "Hiragino Sans GB",
+      "Microsoft YaHei",
+      "Noto Sans SC",
+      system-ui,
+      sans-serif;
+    background-image:
+      radial-gradient(circle at top left, rgba(59, 130, 246, 0.16), transparent 26%),
+      radial-gradient(circle at top right, rgba(14, 165, 233, 0.12), transparent 22%),
+      linear-gradient(180deg, #020617 0%, #0f172a 100%);
+  }
+
+  ::selection {
+    @apply bg-sky-500/30 text-sky-50;
+  }
+}
+
+@layer components {
+  .saas-select {
+    @apply h-10 w-full rounded-lg border border-slate-800 bg-slate-900/60 px-3 text-sm text-slate-100 shadow-sm outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-500/20;
+  }
+
+  .saas-panel {
+    @apply rounded-2xl border border-slate-800 bg-slate-900/60 shadow-sm;
+  }
+
+  .saas-muted-panel {
+    @apply rounded-xl border border-slate-800 bg-slate-900/70;
+  }
+}
