@@ -26,7 +26,7 @@ echo "Validating Docker Compose configuration with $ENV_FILE_PATH..."
 compose config >/dev/null
 
 echo "Collecting migration baseline..."
-compose exec -T project-service sh -lc "cd /app/backend && alembic current || true"
+compose exec -T project-service sh -lc "cd /app/backend && alembic current || true" 2>/dev/null || echo "(project-service not running yet - will check DB directly)"
 
 SCHEMA_FINGERPRINT="$(compose exec -T postgres sh -lc '
   psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atqc "
