@@ -1,4 +1,4 @@
-import { clearToken, getAuthHeaders } from "@/lib/auth";
+﻿import { clearToken, getAuthHeaders } from "@/lib/auth";
 
 export type ServiceHealth = {
   status: string;
@@ -178,37 +178,37 @@ export const platformServices: PlatformService[] = [
   {
     name: "auth-service",
     url: process.env.NEXT_PUBLIC_AUTH_SERVICE_URL ?? "http://localhost:8001",
-    domain: "身份认证与访问控制"
+    domain: "韬唤璁よ瘉涓庤闂帶鍒?
   },
   {
     name: "project-service",
     url: process.env.NEXT_PUBLIC_PROJECT_SERVICE_URL ?? "http://localhost:8002",
-    domain: "项目空间与协作管理"
+    domain: "椤圭洰绌洪棿涓庡崗浣滅鐞?
   },
   {
     name: "agent-service",
     url: process.env.NEXT_PUBLIC_AGENT_SERVICE_URL ?? "http://localhost:8003",
-    domain: "智能员工资产中心"
+    domain: "鏅鸿兘鍛樺伐璧勪骇涓績"
   },
   {
     name: "task-service",
     url: process.env.NEXT_PUBLIC_TASK_SERVICE_URL ?? "http://localhost:8004",
-    domain: "任务生命周期管理"
+    domain: "浠诲姟鐢熷懡鍛ㄦ湡绠＄悊"
   },
   {
     name: "workflow-service",
     url: process.env.NEXT_PUBLIC_WORKFLOW_SERVICE_URL ?? "http://localhost:8005",
-    domain: "流程模板与配置"
+    domain: "娴佺▼妯℃澘涓庨厤缃?
   },
   {
     name: "workflow-engine",
     url: process.env.NEXT_PUBLIC_WORKFLOW_ENGINE_URL ?? "http://localhost:8100",
-    domain: "流程执行引擎"
+    domain: "娴佺▼鎵ц寮曟搸"
   },
   {
     name: "agent-runtime",
     url: process.env.NEXT_PUBLIC_AGENT_RUNTIME_URL ?? "http://localhost:8200",
-    domain: "Agent 运行时"
+    domain: "Agent 杩愯鏃?
   }
 ];
 
@@ -238,7 +238,7 @@ function getAgentServiceUrl(path: string): string {
   return `${base}${prefix}${path}`;
 }
 
-/** AgentInstance / AgentTemplate API (agent-service /api/agent/* 或 /agent/*) */
+/** AgentInstance / AgentTemplate API (agent-service /api/agent/* 鎴?/agent/*) */
 function getAgentInstanceApiUrl(path: string): string {
   const gateway = process.env.NEXT_PUBLIC_API_GATEWAY_URL;
   const agentUrl = process.env.NEXT_PUBLIC_AGENT_SERVICE_URL ?? "http://localhost:8003";
@@ -276,7 +276,7 @@ export type AgentInstanceItem = {
   config?: Record<string, unknown>;
 };
 
-/** 租户侧：获取 Agent 实例详情 */
+/** 绉熸埛渚э細鑾峰彇 Agent 瀹炰緥璇︽儏 */
 export async function getAgentInstance(
   instanceId: string
 ): Promise<AgentInstanceItem> {
@@ -285,7 +285,7 @@ export async function getAgentInstance(
   );
 }
 
-/** 租户侧：更新 Agent 实例 */
+/** 绉熸埛渚э細鏇存柊 Agent 瀹炰緥 */
 export async function updateAgentInstance(
   instanceId: string,
   payload: {
@@ -615,7 +615,7 @@ export async function createAgent(payload: {
   });
 }
 
-/** 租户侧：列出 Agent 实例（从模板创建），支持按 project_id 筛选 */
+/** 绉熸埛渚э細鍒楀嚭 Agent 瀹炰緥锛堜粠妯℃澘鍒涘缓锛夛紝鏀寔鎸?project_id 绛涢€?*/
 export async function listAgentInstances(params?: {
   project_id?: string;
   template_id?: string;
@@ -633,7 +633,7 @@ export async function listAgentInstances(params?: {
   );
 }
 
-/** 租户侧：列出可用的 Agent 模板（用于「从模板创建」） */
+/** 绉熸埛渚э細鍒楀嚭鍙敤鐨?Agent 妯℃澘锛堢敤浜庛€屼粠妯℃澘鍒涘缓銆嶏級 */
 export async function listAgentTemplates(params?: {
   enabled?: boolean;
   limit?: number;
@@ -647,7 +647,7 @@ export async function listAgentTemplates(params?: {
   );
 }
 
-/** 租户侧：从模板创建 Agent 实例 */
+/** 绉熸埛渚э細浠庢ā鏉垮垱寤?Agent 瀹炰緥 */
 export async function createAgentInstanceFromTemplate(payload: {
   template_id: string;
   project_id: string;
@@ -886,3 +886,4 @@ export async function listTools(): Promise<ToolRecord[]> {
     return [];
   }
 }
+

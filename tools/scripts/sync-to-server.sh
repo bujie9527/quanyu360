@@ -1,13 +1,9 @@
 #!/usr/bin/env bash
-# 一键同步本地代码到服务器
-# 用法: ./sync-to-server.sh [选项]
-#   选项:
-#     --with-env    同时同步 .env.production（默认不同步，避免覆盖服务器密钥）
-#     --dry-run     仅预览，不实际传输
+# Sync local code to server (dev/migration only; not for production release)
+# Usage: ./sync-to-server.sh [--with-env] [--dry-run]
 
 set -e
 
-# 可配置项（通过环境变量覆盖）
 SYNC_SERVER="${SYNC_SERVER:-43.165.195.151}"
 SYNC_USER="${SYNC_USER:-ubuntu}"
 SYNC_PORT="${SYNC_PORT:-22}"
@@ -20,7 +16,7 @@ WITH_ENV=false
 DRY_RUN=false
 
 for arg in "$@"; do
-  case $arg in
+  case "$arg" in
     --with-env)
       WITH_ENV=true
       ;;
@@ -28,22 +24,10 @@ for arg in "$@"; do
       DRY_RUN=true
       ;;
     -h|--help)
-      echo "用法: $0 [选项]"
+      echo "Usage: $0 [--with-env] [--dry-run]"
       echo ""
-      echo "选项:"
-      echo "  --with-env    同时同步 .env.production 到服务器（慎用，可能覆盖服务器配置）"
-      echo "  --dry-run     仅预览将要同步的文件，不实际传输"
-      echo ""
-      echo "环境变量:"
-      echo "  SYNC_SERVER       服务器地址 (默认: 43.165.195.151)"
-      echo "  SYNC_USER         用户名 (默认: ubuntu)"
-      echo "  SYNC_PORT         SSH 端口 (默认: 22)"
-      echo "  SYNC_REMOTE_DIR   远程目录 (默认: /opt/ai-workforce)"
-      echo ""
-      echo "示例:"
-      echo "  $0                    # 同步代码（不同步 .env.production）"
-      echo "  $0 --with-env        # 同步代码并包含 .env.production"
-      echo "  SYNC_SERVER=1.2.3.4 $0   # 同步到指定服务器"
+      echo "Environment overrides:"
+      echo "  SYNC_SERVER, SYNC_USER, SYNC_PORT, SYNC_REMOTE_DIR"
       exit 0
       ;;
   esac
@@ -51,7 +35,6 @@ done
 
 cd "$PROJECT_ROOT"
 
-# 排除列表（与 .dockerignore 对齐，并增加开发产物）
 EXCLUDES=(
   --exclude='.git'
   --exclude='.gitignore'
@@ -95,23 +78,22 @@ RSYNC_OPTS=(
 
 if [ "$DRY_RUN" = true ]; then
   RSYNC_OPTS+=(--dry-run --verbose)
-  echo "[sync] 预览模式，不会实际传输文件"
+  echo "[sync] Dry run mode"
 fi
 
 DEST="${SYNC_USER}@${SYNC_SERVER}:${SYNC_REMOTE_DIR}"
-echo "[sync] 源: $PROJECT_ROOT"
-echo "[sync] 目标: $DEST"
-echo ""
+echo "[sync] Source: $PROJECT_ROOT"
+echo "[sync] Target: $DEST"
 
 rsync "${RSYNC_OPTS[@]}" \
   --rsh="ssh -p ${SYNC_PORT} -o ConnectTimeout=10 -o StrictHostKeyChecking=accept-new" \
   ./ \
   "${DEST}/"
 
-echo ""
-echo "[sync] 同步完成。"
-
+echo "[sync] Done"
 if [ "$DRY_RUN" = false ] && [ "$WITH_ENV" = false ]; then
-  echo "[sync] 提示: 未同步 .env.production，服务器上的配置保持不变。"
-  echo "[sync] 如需同步环境变量，请使用: $0 --with-env"
+  echo "[sync] .env.production not synced by default"
 fi
+
+echo "[sync] WARNING: Do not use this script for production release."
+

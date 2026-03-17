@@ -1,4 +1,4 @@
-"""WordPress site HTTP endpoints."""
+﻿"""WordPress site HTTP endpoints."""
 from __future__ import annotations
 
 from uuid import UUID
@@ -40,6 +40,8 @@ def _to_response(site) -> WordPressSiteResponse:
         id=site.id,
         tenant_id=site.tenant_id,
         project_id=site.project_id,
+        server_id=site.server_id,
+        install_task_run_id=site.install_task_run_id,
         name=site.name,
         domain=site.domain,
         api_url=site.api_url,
@@ -47,6 +49,10 @@ def _to_response(site) -> WordPressSiteResponse:
         status=site.status.value,
         created_at=site.created_at,
     )
+
+
+def _to_detail_response(site) -> WordPressSiteDetailResponse:
+    return WordPressSiteDetailResponse(**_to_response(site).model_dump())
 
 
 @router.post("", response_model=WordPressSiteDetailResponse, status_code=status.HTTP_201_CREATED)
@@ -67,17 +73,7 @@ def create_site(
         username=payload.username,
         app_password=payload.app_password,
     )
-    return WordPressSiteDetailResponse(
-        id=site.id,
-        tenant_id=site.tenant_id,
-        project_id=site.project_id,
-        name=site.name,
-        domain=site.domain,
-        api_url=site.api_url,
-        username=site.username,
-        status=site.status.value,
-        created_at=site.created_at,
-    )
+    return _to_detail_response(site)
 
 
 @router.get("", response_model=list[WordPressSiteResponse])
@@ -103,17 +99,7 @@ def get_site(
     if not ctx:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="需要登录")
     site = service.get_site(site_id, ctx.tenant_id)
-    return WordPressSiteDetailResponse(
-        id=site.id,
-        tenant_id=site.tenant_id,
-        project_id=site.project_id,
-        name=site.name,
-        domain=site.domain,
-        api_url=site.api_url,
-        username=site.username,
-        status=site.status.value,
-        created_at=site.created_at,
-    )
+    return _to_detail_response(site)
 
 
 @router.delete("/{site_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -163,17 +149,7 @@ def update_site_credentials(
         app_password=payload.app_password,
         status=WordPressSiteStatus(payload.status),
     )
-    return WordPressSiteDetailResponse(
-        id=site.id,
-        tenant_id=site.tenant_id,
-        project_id=site.project_id,
-        name=site.name,
-        domain=site.domain,
-        api_url=site.api_url,
-        username=site.username,
-        status=site.status.value,
-        created_at=site.created_at,
-    )
+    return _to_detail_response(site)
 
 
 @router.post("/{site_id}/test", response_model=WordPressSiteTestResponse)

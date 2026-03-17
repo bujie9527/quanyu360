@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import enum
 import uuid
@@ -172,7 +172,7 @@ class WordPressSiteStatus(str, enum.Enum):
 
 
 class PlatformDomainStatus(str, enum.Enum):
-    """平台域名池状态。available=可用，assigned=已分配，inactive=停用"""
+    """骞冲彴鍩熷悕姹犵姸鎬併€俛vailable=鍙敤锛宎ssigned=宸插垎閰嶏紝inactive=鍋滅敤"""
     available = "available"
     assigned = "assigned"
     inactive = "inactive"
@@ -603,7 +603,7 @@ class AgentTeamMember(TimestampedUUIDModel):
 
 
 class AgentTemplate(TimestampedUUIDModel):
-    """Agent 模板：预设 system_prompt、model、default_tools、default_workflows 等。用于快速创建 Agent。"""
+    """Agent 妯℃澘锛氶璁?system_prompt銆乵odel銆乨efault_tools銆乨efault_workflows 绛夈€傜敤浜庡揩閫熷垱寤?Agent銆?""
 
     __tablename__ = "agent_templates"
     __table_args__ = (
@@ -642,7 +642,7 @@ class AgentTemplate(TimestampedUUIDModel):
 
 
 class AgentInstance(TimestampedUUIDModel):
-    """Agent 实例：从 AgentTemplate 复制配置，支持 tools_override、system_prompt 覆盖。"""
+    """Agent 瀹炰緥锛氫粠 AgentTemplate 澶嶅埗閰嶇疆锛屾敮鎸?tools_override銆乻ystem_prompt 瑕嗙洊銆?""
 
     __tablename__ = "agent_instances"
     __table_args__ = (
@@ -697,7 +697,7 @@ class AgentInstance(TimestampedUUIDModel):
 
 
 class AgentRun(TimestampedUUIDModel):
-    """Agent 执行日志：每次 run_task / run_workflow / run_task_template 必须写入。"""
+    """Agent 鎵ц鏃ュ織锛氭瘡娆?run_task / run_workflow / run_task_template 蹇呴』鍐欏叆銆?""
     __tablename__ = "agent_runs"
     __table_args__ = (
         Index("ix_agent_runs_agent_id", "agent_id"),
@@ -990,7 +990,7 @@ class AgentWorkflowLink(TimestampedUUIDModel):
 
 
 class PlatformDomain(TimestampedUUIDModel):
-    """平台统一配置的域名池，每个域名已做好 DNS 解析和 SSL 配置。"""
+    """骞冲彴缁熶竴閰嶇疆鐨勫煙鍚嶆睜锛屾瘡涓煙鍚嶅凡鍋氬ソ DNS 瑙ｆ瀽鍜?SSL 閰嶇疆銆?""
     __tablename__ = "platform_domains"
     __table_args__ = (
         Index("ix_platform_domains_status", "status"),
@@ -1137,6 +1137,8 @@ class WordPressSite(TimestampedUUIDModel):
     __table_args__ = (
         Index("ix_wordpress_sites_tenant_id", "tenant_id"),
         Index("ix_wordpress_sites_project_id", "project_id"),
+        Index("ix_wordpress_sites_server_id", "server_id"),
+        Index("ix_wordpress_sites_install_task_run_id", "install_task_run_id"),
     )
 
     platform_domain_id: Mapped[uuid.UUID | None] = mapped_column(
@@ -1144,15 +1146,25 @@ class WordPressSite(TimestampedUUIDModel):
         ForeignKey("platform_domains.id", ondelete="SET NULL"),
         nullable=True,
     )
-    tenant_id: Mapped[uuid.UUID] = mapped_column(
+    server_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("tenants.id", ondelete="CASCADE"),
-        nullable=False,
+        ForeignKey("servers.id", ondelete="SET NULL"),
+        nullable=True,
     )
-    project_id: Mapped[uuid.UUID] = mapped_column(
+    install_task_run_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("projects.id", ondelete="CASCADE"),
-        nullable=False,
+        ForeignKey("task_runs.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    tenant_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("tenants.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    project_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("projects.id", ondelete="SET NULL"),
+        nullable=True,
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     domain: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -1166,12 +1178,12 @@ class WordPressSite(TimestampedUUIDModel):
         server_default=WordPressSiteStatus.active.value,
     )
 
-    tenant: Mapped["Tenant"] = relationship(back_populates="wordpress_sites")
-    project: Mapped["Project"] = relationship(back_populates="wordpress_sites")
+    tenant: Mapped["Tenant | None"] = relationship(back_populates="wordpress_sites")
+    project: Mapped["Project | None"] = relationship(back_populates="wordpress_sites")
 
 
 class ContentSource(TimestampedUUIDModel):
-    """内容源配置：API 或 RSS，用于统一拉取内容。"""
+    """鍐呭婧愰厤缃細API 鎴?RSS锛岀敤浜庣粺涓€鎷夊彇鍐呭銆?""
 
     __tablename__ = "content_sources"
     __table_args__ = (
@@ -1274,7 +1286,7 @@ class Workflow(TimestampedUUIDModel):
 
 
 class TaskTemplate(TimestampedUUIDModel):
-    """任务模板，可绑定 Workflow，定义创建任务时的参数结构。"""
+    """浠诲姟妯℃澘锛屽彲缁戝畾 Workflow锛屽畾涔夊垱寤轰换鍔℃椂鐨勫弬鏁扮粨鏋勩€?""
 
     __tablename__ = "task_templates"
     __table_args__ = (
@@ -1320,7 +1332,7 @@ class TaskTemplate(TimestampedUUIDModel):
 
 
 class Schedule(TimestampedUUIDModel):
-    """定时任务：按 cron 触发 task_template 绑定的 workflow，可指定 target_sites。"""
+    """瀹氭椂浠诲姟锛氭寜 cron 瑙﹀彂 task_template 缁戝畾鐨?workflow锛屽彲鎸囧畾 target_sites銆?""
 
     __tablename__ = "schedules"
     __table_args__ = (
@@ -1346,7 +1358,7 @@ class Schedule(TimestampedUUIDModel):
 
 
 class TaskRun(TimestampedUUIDModel):
-    """Execution log: 一次 task_template 或 workflow 的运行记录。"""
+    """Execution log: 涓€娆?task_template 鎴?workflow 鐨勮繍琛岃褰曘€?""
 
     __tablename__ = "task_runs"
     __table_args__ = (
@@ -1380,7 +1392,7 @@ class TaskRun(TimestampedUUIDModel):
 
 
 class StepRun(TimestampedUUIDModel):
-    """Workflow 单步执行记录。每个 workflow 步骤必须写入。"""
+    """Workflow 鍗曟鎵ц璁板綍銆傛瘡涓?workflow 姝ラ蹇呴』鍐欏叆銆?""
 
     __tablename__ = "step_runs"
     __table_args__ = (
@@ -1778,3 +1790,5 @@ class SystemConfig(TimestampedUUIDModel):
     category: Mapped[str] = mapped_column(String(60), nullable=False)
     is_secret: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     description: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
+

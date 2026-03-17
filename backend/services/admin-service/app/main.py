@@ -1,4 +1,4 @@
-"""Admin service - platform administration and multi-tenant management."""
+﻿"""Admin service - platform administration and multi-tenant management."""
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -8,8 +8,9 @@ from app.controllers import dashboard_router
 from app.controllers import observability_router
 from app.controllers import platform_domains_router
 from app.controllers import roles_router
-from app.controllers import settings_router
 from app.controllers import server_router
+from app.controllers import settings_router
+from app.controllers import site_pool_router
 from app.controllers import tenants_router
 from app.controllers import usage_router
 from common.app.auth import OptionalJWTMiddleware
@@ -41,3 +42,4 @@ app.include_router(dashboard_router)
 app.include_router(tenants_router)
 app.include_router(roles_router)
 app.include_router(server_router)
+app.include_router(site_pool_router)

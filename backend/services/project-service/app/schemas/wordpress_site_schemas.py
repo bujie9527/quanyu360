@@ -1,4 +1,4 @@
-"""WordPress site request/response schemas."""
+﻿"""WordPress site request/response schemas."""
 from __future__ import annotations
 
 from datetime import datetime
@@ -19,8 +19,10 @@ class WordPressSiteCreateRequest(BaseModel):
 
 class WordPressSiteResponse(BaseModel):
     id: UUID
-    tenant_id: UUID
-    project_id: UUID
+    tenant_id: UUID | None
+    project_id: UUID | None
+    server_id: UUID | None = None
+    install_task_run_id: UUID | None = None
     name: str
     domain: str
     api_url: str
@@ -33,9 +35,7 @@ class WordPressSiteResponse(BaseModel):
 
 
 class WordPressSiteDetailResponse(WordPressSiteResponse):
-    """Detail response - same as list, app_password is never returned."""
-
-    pass
+    """Detail response - app_password is never returned."""
 
 
 class WordPressSiteTestResponse(BaseModel):

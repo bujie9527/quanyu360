@@ -1,0 +1,47 @@
+name: Deploy Production
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy-prod:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    env:
+      PROD_HOST: ${{ secrets.PROD_HOST }}
+      PROD_USER: ${{ secrets.PROD_USER }}
+      PROD_PORT: ${{ secrets.PROD_PORT }}
+      PROD_APP_DIR: ${{ secrets.PROD_APP_DIR }}
+
+    steps:
+      - name: Validate required secrets
+        run: |
+          test -n "$PROD_HOST"
+          test -n "$PROD_USER"
+          test -n "${{ secrets.PROD_SSH_KEY }}"
+
+      - name: Start SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.PROD_SSH_KEY }}
+
+      - name: Trust server host key
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -p "${PROD_PORT:-22}" -H "$PROD_HOST" >> ~/.ssh/known_hosts
+
+      - name: Deploy main branch on server
+        run: |
+          TARGET_DIR="${PROD_APP_DIR:-/opt/ai-workforce}"
+          ssh -p "${PROD_PORT:-22}" "$PROD_USER@$PROD_HOST" \
+            "cd '$TARGET_DIR' && BRANCH=main ENV_FILE_PATH=.env.production SMOKE_CHECK_MODE=proxy SMOKE_CHECK_BASE_URL=http://127.0.0.1 sh tools/scripts/deploy-from-git.sh"
+
+      - name: Print last successful deploy SHAs
+        run: |
+          TARGET_DIR="${PROD_APP_DIR:-/opt/ai-workforce}"
+          ssh -p "${PROD_PORT:-22}" "$PROD_USER@$PROD_HOST" \
+            "cd '$TARGET_DIR' && test -f .deploy-history/recent-successful-shas.log && cat .deploy-history/recent-successful-shas.log || echo 'No deploy history yet.'"

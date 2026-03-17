@@ -719,3 +719,94 @@ export async function listAdminAuditLogs(params?: {
   const path = qs.toString() ? `/audit?${qs}` : "/audit";
   return adminRequest<{ items: AuditLogEntry[]; total: number }>(path);
 }
+
+export type SitePoolSiteItem = {
+  id: string;
+  domain: string;
+  name: string;
+  api_url: string;
+  status: "active" | "inactive" | "error";
+  pool_status: "ready" | "installing" | "assigned" | "error";
+  platform_domain_id: string | null;
+  server_id: string | null;
+  install_task_run_id: string | null;
+  tenant_id: string | null;
+  project_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type InstallWorkflowItem = {
+  id: string;
+  project_id: string;
+  name: string;
+  slug: string;
+  status: string;
+};
+
+export type SiteInstallStepLog = {
+  id: string;
+  step_name: string;
+  status: string;
+  duration: number;
+  output_json: Record<string, unknown>;
+  created_at: string;
+};
+
+export type SiteInstallRun = {
+  task_run_id: string;
+  status: string;
+  start_time: string;
+  end_time: string | null;
+  steps: SiteInstallStepLog[];
+};
+
+export async function listSitePoolSites(params?: {
+  server_id?: string;
+  assigned?: boolean;
+  status?: "active" | "inactive" | "error";
+  limit?: number;
+  offset?: number;
+}): Promise<{ items: SitePoolSiteItem[]; total: number }> {
+  const qs = new URLSearchParams();
+  if (params?.server_id) qs.set("server_id", params.server_id);
+  if (params?.assigned !== undefined) qs.set("assigned", String(params.assigned));
+  if (params?.status) qs.set("status", params.status);
+  if (params?.limit) qs.set("limit", String(params.limit));
+  if (params?.offset) qs.set("offset", String(params.offset));
+  const path = qs.toString() ? `/site-pool/sites?${qs}` : "/site-pool/sites";
+  return adminRequest<{ items: SitePoolSiteItem[]; total: number }>(path);
+}
+
+export async function listInstallWorkflows(): Promise<{ items: InstallWorkflowItem[]; total: number }> {
+  return adminRequest<{ items: InstallWorkflowItem[]; total: number }>("/site-pool/install-workflows");
+}
+
+export async function batchInstallSites(payload: {
+  server_id: string;
+  domain_ids: string[];
+  workflow_id?: string;
+  admin_username: string;
+  admin_password: string;
+  admin_email: string;
+  site_title_prefix?: string;
+}): Promise<{ site_ids: string[]; task_run_ids: string[] }> {
+  return adminRequest<{ site_ids: string[]; task_run_ids: string[] }>("/site-pool/batch-install", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function assignSiteToTenant(
+  siteId: string,
+  payload: { tenant_id: string; project_id: string }
+): Promise<SitePoolSiteItem> {
+  return adminRequest<SitePoolSiteItem>(`/site-pool/sites/${siteId}/assign`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getSiteInstallRun(siteId: string): Promise<SiteInstallRun | null> {
+  return adminRequest<SiteInstallRun | null>(`/site-pool/sites/${siteId}/install-run`);
+}
