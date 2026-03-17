@@ -1286,7 +1286,7 @@ class Workflow(TimestampedUUIDModel):
 
 
 class TaskTemplate(TimestampedUUIDModel):
-    """浠诲姟妯℃澘锛屽彲缁戝畾 Workflow锛屽畾涔夊垱寤轰换鍔℃椂鐨勫弬鏁扮粨鏋勩€?""
+    """Task template: can bind Workflow, defines parameter structure for task creation."""
 
     __tablename__ = "task_templates"
     __table_args__ = (
