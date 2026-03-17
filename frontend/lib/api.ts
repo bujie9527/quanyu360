@@ -178,37 +178,37 @@ export const platformServices: PlatformService[] = [
   {
     name: "auth-service",
     url: process.env.NEXT_PUBLIC_AUTH_SERVICE_URL ?? "http://localhost:8001",
-    domain: "韬唤璁よ瘉涓庤闂帶鍒?
+    domain: "Auth & Access Control",
   },
   {
     name: "project-service",
     url: process.env.NEXT_PUBLIC_PROJECT_SERVICE_URL ?? "http://localhost:8002",
-    domain: "椤圭洰绌洪棿涓庡崗浣滅鐞?
+    domain: "Project Space & Collaboration",
   },
   {
     name: "agent-service",
     url: process.env.NEXT_PUBLIC_AGENT_SERVICE_URL ?? "http://localhost:8003",
-    domain: "鏅鸿兘鍛樺伐璧勪骇涓績"
+    domain: "Agent Resource Center",
   },
   {
     name: "task-service",
     url: process.env.NEXT_PUBLIC_TASK_SERVICE_URL ?? "http://localhost:8004",
-    domain: "浠诲姟鐢熷懡鍛ㄦ湡绠＄悊"
+    domain: "Task Lifecycle Management",
   },
   {
     name: "workflow-service",
     url: process.env.NEXT_PUBLIC_WORKFLOW_SERVICE_URL ?? "http://localhost:8005",
-    domain: "娴佺▼妯℃澘涓庨厤缃?
+    domain: "Workflow Templates & Config",
   },
   {
     name: "workflow-engine",
     url: process.env.NEXT_PUBLIC_WORKFLOW_ENGINE_URL ?? "http://localhost:8100",
-    domain: "娴佺▼鎵ц寮曟搸"
+    domain: "Workflow Execution Engine",
   },
   {
     name: "agent-runtime",
     url: process.env.NEXT_PUBLIC_AGENT_RUNTIME_URL ?? "http://localhost:8200",
-    domain: "Agent 杩愯鏃?
+    domain: "Agent Runtime",
   }
 ];
 
