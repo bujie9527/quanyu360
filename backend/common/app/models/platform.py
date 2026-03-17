@@ -642,7 +642,7 @@ class AgentTemplate(TimestampedUUIDModel):
 
 
 class AgentInstance(TimestampedUUIDModel):
-    """Agent 瀹炰緥锛氫粠 AgentTemplate 澶嶅埗閰嶇疆锛屾敮鎸?tools_override銆乻ystem_prompt 瑕嗙洊銆?""
+    """Agent instance: copied from AgentTemplate, supports tools_override and system_prompt override."""
 
     __tablename__ = "agent_instances"
     __table_args__ = (
@@ -1332,7 +1332,7 @@ class TaskTemplate(TimestampedUUIDModel):
 
 
 class Schedule(TimestampedUUIDModel):
-    """瀹氭椂浠诲姟锛氭寜 cron 瑙﹀彂 task_template 缁戝畾鐨?workflow锛屽彲鎸囧畾 target_sites銆?""
+    """Scheduled task: triggers task_template-bound workflow by cron, can specify target_sites."""
 
     __tablename__ = "schedules"
     __table_args__ = (
