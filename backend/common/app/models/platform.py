@@ -172,7 +172,7 @@ class WordPressSiteStatus(str, enum.Enum):
 
 
 class PlatformDomainStatus(str, enum.Enum):
-    """骞冲彴鍩熷悕姹犵姸鎬併€俛vailable=鍙敤锛宎ssigned=宸插垎閰嶏紝inactive=鍋滅敤"""
+    """Platform domain status: available, assigned, inactive."""
     available = "available"
     assigned = "assigned"
     inactive = "inactive"
@@ -603,7 +603,7 @@ class AgentTeamMember(TimestampedUUIDModel):
 
 
 class AgentTemplate(TimestampedUUIDModel):
-    """Agent 妯℃澘锛氶璁?system_prompt銆乵odel銆乨efault_tools銆乨efault_workflows 绛夈€傜敤浜庡揩閫熷垱寤?Agent銆?""
+    """Agent template: presets system_prompt, model, default_tools, default_workflows."""
 
     __tablename__ = "agent_templates"
     __table_args__ = (
@@ -697,7 +697,7 @@ class AgentInstance(TimestampedUUIDModel):
 
 
 class AgentRun(TimestampedUUIDModel):
-    """Agent 鎵ц鏃ュ織锛氭瘡娆?run_task / run_workflow / run_task_template 蹇呴』鍐欏叆銆?""
+    """Agent execution log: each run_task/run_workflow/run_task_template must write here."""
     __tablename__ = "agent_runs"
     __table_args__ = (
         Index("ix_agent_runs_agent_id", "agent_id"),
@@ -990,7 +990,7 @@ class AgentWorkflowLink(TimestampedUUIDModel):
 
 
 class PlatformDomain(TimestampedUUIDModel):
-    """骞冲彴缁熶竴閰嶇疆鐨勫煙鍚嶆睜锛屾瘡涓煙鍚嶅凡鍋氬ソ DNS 瑙ｆ瀽鍜?SSL 閰嶇疆銆?""
+    """Platform domain pool - each domain has DNS and SSL configured."""
     __tablename__ = "platform_domains"
     __table_args__ = (
         Index("ix_platform_domains_status", "status"),
@@ -1183,7 +1183,7 @@ class WordPressSite(TimestampedUUIDModel):
 
 
 class ContentSource(TimestampedUUIDModel):
-    """鍐呭婧愰厤缃細API 鎴?RSS锛岀敤浜庣粺涓€鎷夊彇鍐呭銆?""
+    """Content source config: API or RSS for unified content pulling."""
 
     __tablename__ = "content_sources"
     __table_args__ = (
@@ -1358,7 +1358,7 @@ class Schedule(TimestampedUUIDModel):
 
 
 class TaskRun(TimestampedUUIDModel):
-    """Execution log: 涓€娆?task_template 鎴?workflow 鐨勮繍琛岃褰曘€?""
+    """Execution log: run record for a task_template or workflow."""
 
     __tablename__ = "task_runs"
     __table_args__ = (
@@ -1392,7 +1392,7 @@ class TaskRun(TimestampedUUIDModel):
 
 
 class StepRun(TimestampedUUIDModel):
-    """Workflow 鍗曟鎵ц璁板綍銆傛瘡涓?workflow 姝ラ蹇呴』鍐欏叆銆?""
+    """Workflow step execution record: each workflow step must write here."""
 
     __tablename__ = "step_runs"
     __table_args__ = (
