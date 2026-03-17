@@ -574,9 +574,11 @@ export type ServerItem = {
   wp_cli_bin: string;
   mysql_host: string;
   mysql_port: number;
-  mysql_admin_user: string;
+  mysql_admin_user: string | null;
   mysql_db_prefix: string;
-  status: "active" | "inactive";
+  status: "active" | "inactive" | "pending_setup";
+  setup_status: "pending" | "running" | "completed" | "failed";
+  setup_log: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -601,15 +603,15 @@ export async function createServer(payload: {
   ssh_user: string;
   ssh_password?: string | null;
   ssh_private_key?: string | null;
-  web_root: string;
+  web_root?: string;
   php_bin?: string;
   wp_cli_bin?: string;
   mysql_host?: string;
   mysql_port?: number;
-  mysql_admin_user: string;
-  mysql_admin_password: string;
+  mysql_admin_user?: string | null;
+  mysql_admin_password?: string | null;
   mysql_db_prefix?: string;
-  status?: "active" | "inactive";
+  status?: "active" | "inactive" | "pending_setup";
 }): Promise<ServerItem> {
   return adminRequest<ServerItem>("/servers", {
     method: "POST",

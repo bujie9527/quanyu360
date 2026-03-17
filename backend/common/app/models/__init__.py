@@ -60,6 +60,7 @@ from common.app.models.platform import SitePlanItem
 from common.app.models.platform import SitePlanItemStatus
 from common.app.models.platform import SitePlanStatus
 from common.app.models.platform import Server
+from common.app.models.platform import ServerSetupStatus
 from common.app.models.platform import ServerStatus
 from common.app.models.platform import WordPressSite
 from common.app.models.platform import WordPressSiteStatus
@@ -124,6 +125,7 @@ __all__ = [
     "SitePlanItemStatus",
     "SitePlanStatus",
     "Server",
+    "ServerSetupStatus",
     "ServerStatus",
     "WordPressSite",
     "WordPressSiteStatus",

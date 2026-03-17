@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import enum
 import uuid
@@ -181,6 +181,14 @@ class PlatformDomainStatus(str, enum.Enum):
 class ServerStatus(str, enum.Enum):
     active = "active"
     inactive = "inactive"
+    pending_setup = "pending_setup"
+
+
+class ServerSetupStatus(str, enum.Enum):
+    pending = "pending"
+    running = "running"
+    completed = "completed"
+    failed = "failed"
 
 
 class SitePlanStatus(str, enum.Enum):
@@ -1015,11 +1023,13 @@ class PlatformDomain(TimestampedUUIDModel):
 
 
 class Server(TimestampedUUIDModel):
+    """Server record: SSH credentials + auto-installed LEMP environment info."""
     __tablename__ = "servers"
     __table_args__ = (
         UniqueConstraint("name", name="uq_servers_name"),
         Index("ix_servers_status", "status"),
         Index("ix_servers_host_port", "host", "port"),
+        Index("ix_servers_setup_status", "setup_status"),
     )
 
     name: Mapped[str] = mapped_column(String(120), nullable=False)
@@ -1028,20 +1038,27 @@ class Server(TimestampedUUIDModel):
     ssh_user: Mapped[str] = mapped_column(String(120), nullable=False)
     ssh_password: Mapped[str | None] = mapped_column(String(255), nullable=True)
     ssh_private_key: Mapped[str | None] = mapped_column(Text, nullable=True)
-    web_root: Mapped[str] = mapped_column(String(512), nullable=False)
+    web_root: Mapped[str] = mapped_column(String(512), nullable=False, default="/var/www", server_default="/var/www")
     php_bin: Mapped[str] = mapped_column(String(255), nullable=False, default="php", server_default="php")
     wp_cli_bin: Mapped[str] = mapped_column(String(255), nullable=False, default="wp", server_default="wp")
     mysql_host: Mapped[str] = mapped_column(String(255), nullable=False, default="localhost", server_default="localhost")
     mysql_port: Mapped[int] = mapped_column(Integer, nullable=False, default=3306, server_default="3306")
-    mysql_admin_user: Mapped[str] = mapped_column(String(120), nullable=False)
-    mysql_admin_password: Mapped[str] = mapped_column(String(255), nullable=False)
+    mysql_admin_user: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    mysql_admin_password: Mapped[str | None] = mapped_column(String(255), nullable=True)
     mysql_db_prefix: Mapped[str] = mapped_column(String(32), nullable=False, default="wp_", server_default="wp_")
     status: Mapped[ServerStatus] = mapped_column(
         Enum(ServerStatus, name="server_status"),
         nullable=False,
-        default=ServerStatus.active,
-        server_default=ServerStatus.active.value,
+        default=ServerStatus.pending_setup,
+        server_default=ServerStatus.pending_setup.value,
     )
+    setup_status: Mapped[ServerSetupStatus] = mapped_column(
+        Enum(ServerSetupStatus, name="server_setup_status"),
+        nullable=False,
+        default=ServerSetupStatus.pending,
+        server_default=ServerSetupStatus.pending.value,
+    )
+    setup_log: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     platform_domains: Mapped[list["PlatformDomain"]] = relationship(back_populates="server")
 
